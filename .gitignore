@@ -2,4 +2,5 @@ env/
 .env
 files/
 .cache/
+.streamlit/
 llm_cache.db
