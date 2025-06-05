@@ -36,6 +36,9 @@ def format_docs(docs):
 def embed_file(file):
     file_content = file.read()
     file_path = f"./.cache/files/{file.name}"
+
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+
     with open(file_path, "wb") as f:
         f.write(file_content)
     cache_dir = LocalFileStore(f"./.cache/embeddings/{file.name}")
