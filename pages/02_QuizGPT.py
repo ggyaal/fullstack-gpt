@@ -246,6 +246,7 @@ else:
 
         else:
             score = 0
+            is_end = result.get("isEnd")
             for idx, question in enumerate(st.session_state["quizs"]["questions"]):
                 st.markdown(f"#### Q{idx + 1}. {question['question']}")
                 answer_index = result.get("answers")[idx]
@@ -258,13 +259,15 @@ else:
                         score += 1
                     else:
                         st.error(f"{answer} (오답..)")
+                        if is_end:
+                            st.markdown(f"> **📚 정답: {question['choices'][question['answer_index']]}**")
                 else:
                     st.error("선택하지 않으셨습니다..")
 
                 retry_button, end_button = st.columns([2, 1])
 
             if not score == 10:
-                if not result.get("isEnd"):
+                if not is_end:
                     with retry_button:
                         if st.button("다시 풀기", use_container_width=True):
                             st.session_state["results"].pop((st.session_state["quiz_title"], st.session_state["difficulty"]), None)
