@@ -138,6 +138,7 @@ Difficulty: {difficulty}
 
 with st.sidebar:
     docs = None
+    topic = None
     difficulty = "easy"
 
     api_key = st.text_input(
