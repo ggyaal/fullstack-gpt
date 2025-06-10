@@ -245,3 +245,8 @@ if api_key:
 
 else:
     st.session_state["messages"] = []
+    st.markdown("""
+**siteGPT는 Cloudflare 사이트의 정보를 바탕으로 질문에 대한 답을 해주는 AI 챗봇입니다.**
+
+---
+    """)
