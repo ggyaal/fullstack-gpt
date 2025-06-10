@@ -17,6 +17,7 @@ st.set_page_config(
 llm = ChatOpenAI(
     temperature=0.1,
     model="gpt-4o-mini",
+    openai_api_key="",
 )
 
 func = {
@@ -193,6 +194,8 @@ with st.sidebar:
         label="OPEN AI API KEY",
         placeholder="enter your OPEN AI API KEY!"
     )
+    st.markdown("----")
+    st.link_button("🔗 Github Repository", url="https://github.com/ggyaal/fullstack-gpt/tree/siteGPT")
 
 if api_key:
     llm.openai_api_key = api_key
