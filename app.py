@@ -17,7 +17,7 @@ st.set_page_config(
 llm = ChatOpenAI(
     temperature=0.1,
     model="gpt-4o-mini",
-    openai_api_key="",
+    openai_api_key="OPENAI_API_KEY",
 )
 
 func = {
