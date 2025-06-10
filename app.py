@@ -1,6 +1,5 @@
 import streamlit as st
 import json
-import os
 
 from langchain.document_loaders import SitemapLoader
 from langchain.vectorstores.faiss import FAISS
@@ -15,10 +14,7 @@ st.set_page_config(
     page_icon="📑",
 )
 
-llm = ChatOpenAI(
-    temperature=0.1,
-    model="gpt-4o-mini",
-)
+llm = None
 
 func = {
     "name": "create_message",
@@ -198,7 +194,11 @@ with st.sidebar:
     st.link_button("🔗 Github Repository", url="https://github.com/ggyaal/fullstack-gpt/tree/siteGPT")
 
 if api_key:
-    os.environ["OPENAI_API_KEY"] = api_key
+    llm = ChatOpenAI(
+        temperature=0.1,
+        model="gpt-4o-mini",
+        openai_api_key=api_key
+    )
 
     retriever = load_website("https://developers.cloudflare.com/sitemap-0.xml")
 
