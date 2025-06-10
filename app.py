@@ -15,6 +15,7 @@ st.set_page_config(
 )
 
 llm = None
+embedding = None
 
 func = {
     "name": "create_message",
@@ -166,12 +167,39 @@ def load_website(url):
     )
     loader.requests_per_second = 1
     docs = loader.load_and_split(text_splitter=splitter)
-    vector_store = FAISS.from_documents(docs, OpenAIEmbeddings())
+    vector_store = FAISS.from_documents(docs, embedding)
     
     return vector_store.as_retriever()
 
+def save_message(message, role, source=None, date=None):
+    st.session_state["messages"].append({"message": message, "role": role, "source": source, "date": date})
+    with st.sidebar:
+        st.write(st.session_state["messages"])
+
+def send_message(message, role, source=None, date=None, save=True):
+    with st.chat_message(role):
+        st.markdown(message)
+        if source and date:
+            st.info(f"""
+                출처: **{source}**
+                _{date}_
+            """)
+
+    if save:
+        save_message(message, role, source, date)
+
+def paint_history():
+    for message in st.session_state["messages"]:
+        send_message(
+            message=message["message"],
+            role=message["role"],
+            source=message["source"],
+            date=message["date"],
+            save=False,
+        )
+
 @st.cache_data(show_spinner="thinking ..")
-def save_message(query):
+def ai_answer(query):
     chain = (
         {
             "question": RunnablePassthrough(),
@@ -197,18 +225,23 @@ if api_key:
     llm = ChatOpenAI(
         temperature=0.1,
         model="gpt-4o-mini",
+        openai_api_key=api_key,
+    )
+
+    embedding = OpenAIEmbeddings(
         openai_api_key=api_key
     )
 
     retriever = load_website("https://developers.cloudflare.com/sitemap-0.xml")
 
-    query = st.text_input("Ask a question to the website.")
+    paint_history()
+    send_message("오케이! 질문해줘:)", "ai", save=False)
+    query = st.chat_input("'Cloudflare'에 대해 질문하세요.")
     if query:
-        message = save_message(query)
+        send_message(query, "human")
+        message = ai_answer(query)
 
-        with st.chat_message("ai"):
-            st.markdown(f"**{message['comment']}**")
-            st.info(f"""
-                출처: **{message['source']}**
-                _{message['date']}_
-            """)
+        send_message(message["comment"], role="ai", source=message["source"], date=message["date"])
+
+else:
+    st.session_state["messages"] = []
