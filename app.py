@@ -173,8 +173,6 @@ def load_website(url):
 
 def save_message(message, role, source=None, date=None):
     st.session_state["messages"].append({"message": message, "role": role, "source": source, "date": date})
-    with st.sidebar:
-        st.write(st.session_state["messages"])
 
 def send_message(message, role, source=None, date=None, save=True):
     message = message.replace("$", "\$")
