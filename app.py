@@ -177,6 +177,7 @@ def save_message(message, role, source=None, date=None):
         st.write(st.session_state["messages"])
 
 def send_message(message, role, source=None, date=None, save=True):
+    message = message.replace("$", "\$")
     with st.chat_message(role):
         st.markdown(message)
         if source and date:
