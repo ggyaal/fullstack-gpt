@@ -235,8 +235,8 @@ if api_key:
 
     retriever = load_website("https://developers.cloudflare.com/sitemap-0.xml")
 
-    paint_history()
     send_message("오케이! 질문해줘:)", "ai", save=False)
+    paint_history()
     query = st.chat_input("'Cloudflare'에 대해 질문하세요.")
     if query:
         send_message(query, "human")
