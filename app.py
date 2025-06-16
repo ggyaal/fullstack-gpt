@@ -1,11 +1,12 @@
 import streamlit as st
-from openai import OpenAI, AssistantEventHandler
+from openai import OpenAI
 from langchain.utilities.duckduckgo_search import DuckDuckGoSearchAPIWrapper
 from langchain.utilities.wikipedia import WikipediaAPIWrapper
 import requests
 from bs4 import BeautifulSoup
 import json
 import os
+import time
 import datetime
 
 EXTRACT_FILE_DIR = "./files"
@@ -50,92 +51,17 @@ Extracted Text: {text.strip()}
         return f"Error saving content: {str(e)}"
 
 functions_map = {
-    "search_duckduckgo": search_duckduckgo,
-    "search_wikipedia": search_wikipedia,
-    "website_scraping": website_scraping,
-    "save_or_append_to_text": save_or_append_to_text,
+    "search_duckduckgo": {"func": search_duckduckgo, "status": "🦆 DuckDuckGo 검색 중 ..."},
+    "search_wikipedia": {"func": search_wikipedia, "status": "📜 Wikipedia 검색 중 ..."},
+    "website_scraping": {"func": website_scraping, "status": "🌐 웹사이트 스크래핑 중 ..."},
+    "save_or_append_to_text": {"func": save_or_append_to_text, "status": "💾 텍스트 저장 중 ..."},
 }
-
-class EventHandler(AssistantEventHandler):
-    
-    def __init__(self, status_ref, message_box=None, message=""):
-        super().__init__()
-        self.status_ref = status_ref
-        self.message = message
-        self.message_box = message_box or st.empty()
-
-    def on_event(self, event):
-        run_id = event.data.id
-
-        if event.event == "thread.run.created":
-            self.status_ref.update(label="📑 접수 중 ...", state="running")
-        elif event.event == "thread.run.requires_action":
-            self.status_ref.update(label="🔍 검색 중 ...", state="running")
-            self.handle_required_action(event.data, run_id)
-        elif event.event == "thread.message.created":
-            self.status_ref.update(label="✍️ 응답 생성 중...", state="running")
-            self.message_box = st.empty()
-            self.message = ""
-        elif event.event == "thread.run.completed":
-            self.status_ref.update(label="✅ 완료!", state="complete")
-            save_message("ai", self.message)
-            st.rerun()
-
-        elif event.event == "thread.run.failed":
-            self.status_ref.update(label="❌ 실패!", state="error")
-        return super().on_event(event)
-
-    def handle_required_action(self, data, run_id):
-        tool_outputs = []
-
-        for tool in data.required_action.submit_tool_outputs.tool_calls:
-            if tool.function.name == "search_duckduckgo":
-                self.status_ref.update(label="🦆 DuckDuckGo 검색 중 ...", state="running")
-            elif tool.function.name == "search_wikipedia":
-                self.status_ref.update(label="📜 Wikipedia 검색 중 ...", state="running")
-            elif tool.function.name == "website_scraping":
-                self.status_ref.update(label="𝍌 웹사이트 스크래핑 중 ...", state="running")
-            elif tool.function.name == "save_to_text":
-                self.status_ref.update(label="💾 텍스트 저장 중 ...", state="running")
-            tool_outputs.append({
-                "tool_call_id": tool.id,
-                "output": functions_map[tool.function.name](json.loads(tool.function.arguments)),
-            })
-
-        self.submit_tool_outputs(tool_outputs, run_id)
-
-    def submit_tool_outputs(self, tool_outputs, run_id):
-        handler = EventHandler(
-            status_ref=self.status_ref,
-            message_box=self.message_box,
-            message=self.message,
-        )
-
-        with client.beta.threads.runs.submit_tool_outputs_stream(
-            thread_id=self.current_run.thread_id,
-            run_id=run_id,
-            tool_outputs=tool_outputs,
-            event_handler=handler,
-        ) as stream:
-            for text in stream.text_deltas:
-                handler.message += text
-                handler.message_box.markdown(handler.message)
 
 client = None
 
 def send_message(thread_id, query):
     return client.beta.threads.messages.create(
         thread_id=thread_id, role="user", content=query
-    )
-
-def create_thread(query):
-    return client.beta.threads.create(
-        messages=[
-            {
-                "role": "user",
-                "content": query,
-            }
-        ]
     )
 
 def handle_tool_calls(tool_calls):
@@ -282,7 +208,7 @@ AI가 `DuckDuckGo`와 `Wikipedia`를 동시에 검색해서
         selected_file = None
     else:
         client = OpenAI(api_key=openai_api_key)
-        send_message("ai", "안녕하세요! 무엇을 검색할까요?", is_save=False)
+        send_message("assistant", "안녕하세요! 무엇을 검색할까요?", is_save=False)
 
         paint_history()
 
@@ -293,12 +219,60 @@ AI가 `DuckDuckGo`와 `Wikipedia`를 동시에 검색해서
                 thread_id = create_thread(query)
 
             send_message("user", query)
-            with st.chat_message("ai"):
-                with st.status(label="🐚 시작 중 ...", state="running") as status_ref:
-                    with client.beta.threads.runs.stream(
+            with st.chat_message("assistant"):
+                status_box = st.empty()
+                status_ref = status_box.status(label="🐚 시작 중 ...", state="running")
+
+                run = client.beta.threads.runs.create(
+                    assistant_id=assistant_id,
+                    thread_id=thread_id,
+                )
+
+                while True:
+                    run = client.beta.threads.runs.retrieve(
                         thread_id=thread_id,
-                        assistant_id=assistant_id,
-                        event_handler=EventHandler(status_ref=status_ref),
-                    ) as stream:
-                        stream.until_done()
+                        run_id=run.id,
+                    )
+
+                    if run.status == "in_progress":
+                        status_ref.update(label="💡 생각 중 ...", state="running")
+
+                    elif run.status == "requires_action":
+                        status_ref.update(label="🔍 검색 중 ...", state="running")
+                        tool_inputs = []
+
+                        for tool_call in run.required_action.submit_tool_outputs.tool_calls:
+                            function_info = functions_map.get(tool_call.function.name)
+                            status_ref.update(label=function_info["status"], state="running")
+                            tool_inputs.append({
+                                "tool_call_id": tool_call.id,
+                                "output": function_info["func"](json.loads(tool_call.function.arguments)),
+                            })
+
+                            run = client.beta.threads.runs.submit_tool_outputs(
+                                thread_id=thread_id,
+                                run_id=run.id,
+                                tool_outputs=tool_inputs,
+                            )
+
+                    elif run.status == "completed":
+                        status_ref.update(label="✅ 완료!", state="complete")
+                        messages = client.beta.threads.messages.list(thread_id=thread_id)
+                        for message in reversed(messages.data):
+                            if message.role == "assistant":
+                                message_text = message.content[0].text.value
+                                st.markdown(message_text)
+                                save_message("assistant", message_text)
+                                break
+                        status_box.empty()
+                        st.rerun()
+                        break
+
+                    elif run.status in ["failed", "cancelled"]:
+                        status_ref.update(label="❌ 실패!", state="error")
+                        st.error(f"Run {run.status}.")
+                        break
+                    
+                    time.sleep(1)
+
 
